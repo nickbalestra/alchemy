@@ -119,24 +119,28 @@ export const Bundle = Resource(
     props: BundleProps
   ): Promise<Bundle> {
     // Determine output path
-    const outDirPath = getOutDirPath(props);
+    const outDirPath =
+      props.outfile != null ? path.dirname(props.outfile) : props.outdir;
+
+    if (outDirPath == null) {
+      throw new Error(
+        `You need to specify either outfile or outdir in your bundle configuration ${JSON.stringify(props)}`
+      );
+    }
 
     // Ensure output directory exists
     await fs.promises.mkdir(path.dirname(outDirPath), { recursive: true });
     if (this.phase === "delete") {
-      await cleanDirectory(outDirPath);
-      return this.destroy();
+      await fs.promises.rm(outDirPath, { recursive: true });
     }
 
     const result = await bundle(props);
     // Check that bundle created output an file for the given entrypoint
     // Use bundle metada data to retrieve its content
-    let bundleOutputPath;
-    for (const file in result.metafile.outputs) {
-      if (result.metafile.outputs[file].entryPoint === props.entryPoint) {
-        bundleOutputPath = file;
-      }
-    }
+    const bundleOutputPath = Object.entries(result.metafile.outputs).find(
+      ([file, output]) => output.entryPoint === props.entryPoint
+    )?.[0];
+
     if (!bundleOutputPath) {
       throw new Error(`Unable to find a compiled file`);
     }
@@ -180,33 +184,4 @@ export async function bundle(props: BundleProps) {
     metafile: true,
     write: true,
   });
-}
-
-function getOutDirPath(props: BundleProps) {
-  if (props.outfile != null) return path.dirname(props.outfile);
-  if (props.outdir != null) return props.outdir;
-
-  throw new Error(
-    `You need to specify either outfile or outdir in your bundle configuration ${JSON.stringify(props)}`
-  );
-}
-
-async function cleanDirectory(dirPath: string) {
-  try {
-    const files = await fs.promises.readdir(dirPath);
-
-    for (const file of files) {
-      const filePath = path.join(dirPath, file);
-      const stats = await fs.promises.stat(filePath);
-
-      if (stats.isFile()) {
-        await fs.promises.unlink(filePath);
-      } else if (stats.isDirectory()) {
-        await fs.promises.rmdir(filePath, { recursive: true });
-      }
-    }
-  } catch (err) {
-    console.error(`Error cleaning directory ${dirPath}:`, err);
-    throw err;
-  }
 }
