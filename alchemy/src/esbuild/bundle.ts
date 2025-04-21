@@ -138,7 +138,23 @@ export const Bundle = Resource(
     // Check that bundle created output an file for the given entrypoint
     // Use bundle metada data to retrieve its content
     const bundleOutputPath = Object.entries(result.metafile.outputs).find(
-      ([file, output]) => output.entryPoint === props.entryPoint
+      ([file, output]) => {
+        if (output.entryPoint === undefined) {
+          return false;
+        }
+        // resolve to absolute and then relative to ensure consistent result (e.g. ./src/handler.ts instead of src/handler.ts)
+        const relativeOutput = path.relative(
+          process.cwd(),
+          path.resolve(output.entryPoint)
+        );
+        return (
+          relativeOutput ===
+          path.relative(
+            process.cwd(),
+            path.resolve(process.cwd(), props.entryPoint)
+          )
+        );
+      }
     )?.[0];
 
     if (!bundleOutputPath) {
