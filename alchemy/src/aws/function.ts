@@ -282,7 +282,7 @@ export interface Function extends Resource<"lambda::Function">, FunctionProps {
  * });
  *
  * @example
- * // Create a function with a public URL endpoint and CORS
+ * // Create a function with a public URL endpoint, CORS and optional response streaming
  * const apiFunction = await Function("public-api", {
  *   functionName: "public-api",
  *   zipPath: "./dist/api.zip",
@@ -290,6 +290,7 @@ export interface Function extends Resource<"lambda::Function">, FunctionProps {
  *   handler: "api.handler",
  *   url: {
  *     authType: "NONE",
+ *     invokeMode: "RESPONSE_STREAM",
  *     cors: {
  *       allowOrigins: ["*"],
  *       allowMethods: ["GET", "POST"],
