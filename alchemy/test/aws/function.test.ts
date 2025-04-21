@@ -514,5 +514,158 @@ describe("AWS Resources", () => {
         await destroy(scope);
       }
     });
+
+    test("create function with URL invokeMode configuration", async (scope) => {
+      // Define resources that need to be cleaned up
+      let role: Role | undefined = undefined;
+      let func: Function | null = null;
+      const functionName = `${BRANCH_PREFIX}-alchemy-test-func-invoke-mode`;
+      const roleName = `${BRANCH_PREFIX}-alchemy-test-lambda-invoke-mode-role`;
+
+      try {
+        let bundle = await Bundle(
+          `${BRANCH_PREFIX}-test-lambda-invoke-mode-bundle`,
+          {
+            entryPoint: path.join(__dirname, "..", "handler.ts"),
+            outdir: ".out",
+            format: "cjs",
+            platform: "node",
+            target: "node18",
+          }
+        );
+
+        role = await Role(roleName, {
+          roleName,
+          assumeRolePolicy: LAMBDA_ASSUME_ROLE_POLICY,
+          description: "Test role for Lambda function with invoke mode",
+          policies: [
+            {
+              policyName: "logs",
+              policyDocument: LAMBDA_LOGS_POLICY,
+            },
+          ],
+          tags: {
+            Environment: "test",
+          },
+        });
+
+        // Create the Lambda function with BUFFERED invoke mode (default)
+        func = await Function(functionName, {
+          functionName,
+          bundle,
+          roleArn: role.arn,
+          handler: "handler.handler",
+          runtime: "nodejs20.x",
+          tags: {
+            Environment: "test",
+          },
+          url: {
+            authType: "NONE",
+            // Default invokeMode is BUFFERED if not specified
+            cors: {
+              allowOrigins: ["*"],
+              allowMethods: ["GET", "POST"],
+              allowHeaders: ["Content-Type"],
+            },
+          },
+        });
+
+        // Verify function was created with URL
+        expect(func.arn).toBeTruthy();
+        expect(func.state).toBe("Active");
+        expect(func.functionUrl).toBeTruthy();
+
+        // Test function URL invocation (default BUFFERED mode)
+        const testEvent = { test: "buffered-mode" };
+        const response = await fetch(func.functionUrl!, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(testEvent),
+        });
+
+        expect(response.status).toBe(200);
+        const responseBody = await response.json();
+        expect(responseBody.message).toBe("Hello from bundled handler!");
+        expect(responseBody.event).toEqual(testEvent);
+
+        // Update function to explicitly set BUFFERED mode
+        func = await Function(functionName, {
+          functionName,
+          bundle,
+          roleArn: role.arn,
+          handler: "handler.handler",
+          runtime: "nodejs20.x",
+          tags: {
+            Environment: "test",
+          },
+          url: {
+            authType: "NONE",
+            invokeMode: "BUFFERED", // Explicitly set BUFFERED
+            cors: {
+              allowOrigins: ["*"],
+              allowMethods: ["GET", "POST"],
+              allowHeaders: ["Content-Type"],
+            },
+          },
+        });
+
+        // Verify function still has URL
+        expect(func.functionUrl).toBeTruthy();
+
+        // Now update to RESPONSE_STREAM mode
+        func = await Function(functionName, {
+          functionName,
+          bundle,
+          roleArn: role.arn,
+          handler: "handler.handler",
+          runtime: "nodejs20.x",
+          tags: {
+            Environment: "test",
+          },
+          url: {
+            authType: "NONE",
+            invokeMode: "RESPONSE_STREAM", // Change to streaming mode
+            cors: {
+              allowOrigins: ["*"],
+              allowMethods: ["GET", "POST"],
+              allowHeaders: ["Content-Type"],
+            },
+          },
+        });
+
+        // Verify function still has URL
+        expect(func.functionUrl).toBeTruthy();
+
+        // Test function URL invocation (now in RESPONSE_STREAM mode)
+        const streamTestEvent = { test: "response-stream-mode" };
+        const streamResponse = await fetch(func.functionUrl!, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(streamTestEvent),
+        });
+
+        expect(streamResponse.status).toBe(200);
+        const streamResponseBody = await streamResponse.json();
+        expect(streamResponseBody.message).toBe("Hello from bundled handler!");
+        expect(streamResponseBody.event).toEqual(streamTestEvent);
+      } finally {
+        await destroy(scope);
+
+        // Verify function was properly deleted after cleanup
+        if (func) {
+          await expect(
+            lambda.send(
+              new GetFunctionCommand({
+                FunctionName: functionName,
+              })
+            )
+          ).rejects.toThrow(ResourceNotFoundException);
+        }
+      }
+    });
   });
 });
