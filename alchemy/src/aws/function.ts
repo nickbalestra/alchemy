@@ -89,6 +89,11 @@ export interface FunctionProps {
    */
   url?: {
     /**
+     * Configure type of response for the function URL
+     */
+    invokeMode?: "BUFFERED" | "RESPONSE_STREAM";
+
+    /**
      * Authentication type for the function URL
      */
     authType?: "AWS_IAM" | "NONE";
@@ -387,6 +392,7 @@ export const Function = Resource(
                   new UpdateFunctionUrlConfigCommand({
                     FunctionName: props.functionName,
                     AuthType: props.url.authType || "NONE",
+                    InvokeMode: props.url.invokeMode || "BUFFERED",
                     Cors: props.url.cors
                       ? {
                           AllowCredentials: props.url.cors.allowCredentials,
@@ -425,6 +431,7 @@ export const Function = Resource(
                   new CreateFunctionUrlConfigCommand({
                     FunctionName: props.functionName,
                     AuthType: props.url.authType || "NONE",
+                    InvokeMode: props.url.invokeMode || "BUFFERED",
                     Cors: props.url.cors
                       ? {
                           AllowCredentials: props.url.cors.allowCredentials,
@@ -465,6 +472,7 @@ export const Function = Resource(
                   new CreateFunctionUrlConfigCommand({
                     FunctionName: props.functionName,
                     AuthType: props.url.authType || "NONE",
+                    InvokeMode: props.url.invokeMode || "BUFFERED",
                     Cors: props.url.cors
                       ? {
                           AllowCredentials: props.url.cors.allowCredentials,
@@ -585,6 +593,7 @@ export const Function = Resource(
                 new CreateFunctionUrlConfigCommand({
                   FunctionName: props.functionName,
                   AuthType: props.url.authType || "NONE",
+                  InvokeMode: props.url.invokeMode || "BUFFERED",
                   Cors: props.url.cors
                     ? {
                         AllowCredentials: props.url.cors.allowCredentials,
