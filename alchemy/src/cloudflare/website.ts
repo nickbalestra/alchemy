@@ -61,7 +61,7 @@ export type Website<B extends Bindings> = B extends { ASSETS: any }
 
 export async function Website<B extends Bindings>(
   id: string,
-  props: WebsiteProps<B>,
+  props: WebsiteProps<B>
 ): Promise<Website<B>> {
   if (props.bindings?.ASSETS) {
     throw new Error("ASSETS binding is reserved for internal use");
@@ -70,20 +70,41 @@ export async function Website<B extends Bindings>(
   return alchemy.run(id, async () => {
     // building the site requires a wrangler.jsonc file to start
     // - so initialize an empty one if it doesn't exist
-
     const cwd = path.resolve(props.cwd || process.cwd());
-    const fileName =
-      typeof props.wrangler === "boolean"
-        ? "wrangler.jsonc"
-        : typeof props.wrangler === "string"
-          ? props.wrangler
-          : (props.wrangler?.path ?? "wrangler.jsonc");
-    const wranglerPath =
-      fileName && path.relative(cwd, path.join(cwd, fileName));
-    const wranglerMain =
-      typeof props.wrangler === "object"
-        ? (props.wrangler.main ?? props.main)
-        : props.main;
+
+    let fileName;
+    let wranglerPath;
+    let wranglerMain = path.join(cwd, props.main ?? "");
+    // Building fileName and wranglerPath for all the different supporteded cases of props.wrangler
+    // Taking into consideration also cwd
+    if (typeof props.wrangler === "boolean") {
+      fileName = "wrangler.jsonc";
+      wranglerPath = cwd;
+    }
+    if (typeof props.wrangler === "string") {
+      if (path.basename(props.wrangler) === props.wrangler) {
+        fileName = props.wrangler;
+        wranglerPath = cwd;
+      } else {
+        fileName = path.basename(props.wrangler);
+        wranglerPath = path.dirname(props.wrangler);
+      }
+    }
+    if (typeof props.wrangler === "object" && props.wrangler != null) {
+      if (props.wrangler.main != null) {
+        wranglerMain = path.join(cwd, props.wrangler.main);
+      }
+      if (props.wrangler.path == null) {
+        fileName = "wrangler.jsonc";
+        wranglerPath = cwd;
+      } else if (path.basename(props.wrangler.path) === props.wrangler.path) {
+        fileName = props.wrangler.path;
+        wranglerPath = cwd;
+      } else {
+        fileName = path.basename(props.wrangler.path);
+        wranglerPath = path.dirname(props.wrangler.path);
+      }
+    }
 
     if (props.wrangler) {
       try {
@@ -96,15 +117,17 @@ export async function Website<B extends Bindings>(
               name: id,
               main: wranglerMain,
               compatibility_date: new Date().toISOString().split("T")[0],
+              compatibility_flags: props.compatibilityFlags ?? [],
             },
             null,
-            2,
-          ),
+            2
+          )
         );
       }
     }
 
     await Exec("build", {
+      cwd,
       command: props.command,
     });
 
