@@ -502,10 +502,10 @@ describe("Price Resource", () => {
         currency: "usd",
         billingScheme: "tiered",
         tiersMode: "graduated",
-        meter: meter.id,
         recurring: {
           interval: "month",
           usageType: "metered",
+          meter: meter.id,
         },
         tiers: [
           {
@@ -525,15 +525,15 @@ describe("Price Resource", () => {
         currency: "usd",
         billingScheme: "tiered",
         tiersMode: "graduated",
-        meter: meter.id,
         recurring: {
           interval: "month",
           usageType: "metered",
+          meter: meter.id,
         },
       });
 
       // Verify the meter is correctly set
-      expect(price.meter).toEqual(meter.id);
+      expect(price.recurring?.meter).toEqual(meter.id);
     } catch (err) {
       console.log(err);
       throw err;
@@ -562,23 +562,11 @@ describe("Price Resource", () => {
         Price(`${testPriceId}-meter-invalid-usage`, {
           product: product.id,
           currency: "usd",
-          meter: "meter_test_invalid",
           recurring: {
             interval: "month",
             usageType: "licensed", // Not metered
+            meter: "meter_test_invalid",
           },
-        }),
-      ).rejects.toThrow(
-        "Meter can only be set for prices with recurring.usageType = 'metered'",
-      );
-
-      // Test: meter requires recurring
-      await expect(
-        Price(`${testPriceId}-meter-no-recurring`, {
-          product: product.id,
-          currency: "usd",
-          unitAmount: 1000,
-          meter: "meter_test_invalid",
         }),
       ).rejects.toThrow(
         "Meter can only be set for prices with recurring.usageType = 'metered'",

@@ -169,10 +169,10 @@ const meteredPrice = await Price("api-usage-with-meter", {
   currency: "usd",
   billingScheme: "tiered",
   tiersMode: "graduated",
-  meter: "meter_123abc", // Associate with billing meter
   recurring: {
     interval: "month",
     usageType: "metered", // Required for meter association
+    meter: "meter_123abc" // Associate with billing meter
   },
   tiers: [
     { upTo: 10000, unitAmountDecimal: "0" },

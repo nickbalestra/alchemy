@@ -32,6 +32,12 @@ export interface PriceRecurring {
    * `last_ever` for picking the last usage record ever (across period bounds) or `max` which picks the usage record with the maximum reported usage during a period.
    */
   aggregateUsage?: Stripe.PriceCreateParams.Recurring.AggregateUsage;
+
+  /**
+   * The ID of the billing meter this price is associated with.
+   * Only applicable when usageType = 'metered'.
+   */
+  meter?: string;
 }
 
 type TaxBehavior = Stripe.PriceCreateParams.TaxBehavior;
@@ -180,12 +186,6 @@ export interface PriceProps {
         round: "up" | "down";
       }
     | undefined;
-
-  /**
-   * The ID of the billing meter this price is associated with.
-   * Only applicable for prices with recurring.usageType = 'metered'.
-   */
-  meter?: string;
 }
 
 /**
@@ -236,11 +236,6 @@ export interface Price extends Resource<"stripe::Price">, PriceProps {
         round: "up" | "down";
       }
     | undefined;
-
-  /**
-   * The billing meter ID associated with this price (if applicable)
-   */
-  meter?: string;
 }
 
 /**
@@ -339,10 +334,10 @@ export interface Price extends Resource<"stripe::Price">, PriceProps {
  *   currency: "usd",
  *   billingScheme: "tiered",
  *   tiersMode: "graduated",
- *   meter: "meter_123abc", // Associate with billing meter
  *   recurring: {
  *     interval: "month",
- *     usageType: "metered"
+ *     usageType: "metered",
+ *     meter: "meter_123abc" // Associate with billing meter
  *   },
  *   tiers: [
  *     { upTo: 10000, unitAmountDecimal: "0" },
@@ -436,7 +431,7 @@ export const Price = Resource(
           };
 
           // Add meter to recurring if present (only for metered usage type)
-          if (props.meter) {
+          if (props.recurring.meter) {
             if (props.recurring.usageType !== "metered") {
               throw new Error(
                 "Meter can only be set for prices with recurring.usageType = 'metered'",
@@ -447,7 +442,7 @@ export const Price = Resource(
               createParams.recurring as Stripe.PriceCreateParams.Recurring & {
                 meter: string;
               }
-            ).meter = props.meter;
+            ).meter = props.recurring.meter;
           }
         }
 
@@ -472,13 +467,6 @@ export const Price = Resource(
             divide_by: props.transformQuantity.divideBy,
             round: props.transformQuantity.round,
           };
-        }
-
-        // Check if meter is set without recurring
-        if (props.meter && !props.recurring) {
-          throw new Error(
-            "Meter can only be set for prices with recurring.usageType = 'metered'",
-          );
         }
 
         if (props.lookupKey) {
@@ -527,6 +515,9 @@ export const Price = Resource(
               .usage_type as Stripe.PriceCreateParams.Recurring.UsageType,
             aggregateUsage: price.recurring
               .aggregate_usage as Stripe.PriceCreateParams.Recurring.AggregateUsage,
+            meter: (
+              price.recurring as Stripe.Price.Recurring & { meter?: string }
+            ).meter,
           }
         : undefined;
 
@@ -570,11 +561,6 @@ export const Price = Resource(
         tiers: tiers,
         tiersMode: price.tiers_mode ?? undefined,
         transformQuantity: transformQuantity,
-        meter:
-          (price.recurring &&
-            (price.recurring as Stripe.Price.Recurring & { meter?: string })
-              .meter) ||
-          undefined,
       });
     } catch (error) {
       logger.error("Error creating/updating price:", error);
