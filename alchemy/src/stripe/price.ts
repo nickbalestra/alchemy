@@ -162,22 +162,24 @@ export interface PriceProps {
    * In `volume`-based tiering, the maximum quantity within a period determines the per unit price.
    * In `graduated` tiering, pricing can change as the quantity grows.
    */
-  tiersMode?: "graduated" | "volume";
+  tiersMode?: "graduated" | "volume" | undefined;
 
   /**
    * Apply a transformation to the reported usage or set quantity before computing the amount billed
    */
-  transformQuantity?: {
-    /**
-     * Divide usage by this number
-     */
-    divideBy: number;
+  transformQuantity?:
+    | {
+        /**
+         * Divide usage by this number
+         */
+        divideBy: number;
 
-    /**
-     * After dividing usage, either round the result `up` or `down`
-     */
-    round: "up" | "down";
-  };
+        /**
+         * After dividing usage, either round the result `up` or `down`
+         */
+        round: "up" | "down";
+      }
+    | undefined;
 }
 
 /**
@@ -217,15 +219,17 @@ export interface Price extends Resource<"stripe::Price">, PriceProps {
   /**
    * The tiering mode (graduated or volume)
    */
-  tiersMode?: "graduated" | "volume" | null;
+  tiersMode?: "graduated" | "volume" | undefined;
 
   /**
    * Transform quantity configuration
    */
-  transformQuantity?: {
-    divideBy: number;
-    round: "up" | "down";
-  } | null;
+  transformQuantity?:
+    | {
+        divideBy: number;
+        round: "up" | "down";
+      }
+    | undefined;
 }
 
 /**
@@ -509,7 +513,7 @@ export const Price = Resource(
         type: price.type as Stripe.Price.Type,
         lookupKey: price.lookup_key || undefined,
         tiers: tiers,
-        tiersMode: price.tiers_mode as "graduated" | "volume" | null,
+        tiersMode: price.tiers_mode ?? undefined,
         transformQuantity: transformQuantity,
       });
     } catch (error) {
