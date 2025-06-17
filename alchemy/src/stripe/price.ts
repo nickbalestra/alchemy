@@ -180,6 +180,12 @@ export interface PriceProps {
         round: "up" | "down";
       }
     | undefined;
+
+  /**
+   * The ID of the billing meter this price is associated with.
+   * Only applicable for prices with recurring.usageType = 'metered'.
+   */
+  meter?: string;
 }
 
 /**
@@ -230,6 +236,11 @@ export interface Price extends Resource<"stripe::Price">, PriceProps {
         round: "up" | "down";
       }
     | undefined;
+
+  /**
+   * The billing meter ID associated with this price (if applicable)
+   */
+  meter?: string;
 }
 
 /**
@@ -320,6 +331,25 @@ export interface Price extends Resource<"stripe::Price">, PriceProps {
  *     }
  *   ]
  * });
+ *
+ * @example
+ * // Create a metered price with billing meter for API usage tracking
+ * const meteredPrice = await Price("api-usage-price", {
+ *   product: "prod_xyz",
+ *   currency: "usd",
+ *   billingScheme: "tiered",
+ *   tiersMode: "graduated",
+ *   meter: "meter_123abc", // Associate with billing meter
+ *   recurring: {
+ *     interval: "month",
+ *     usageType: "metered"
+ *   },
+ *   tiers: [
+ *     { upTo: 10000, unitAmountDecimal: "0" },
+ *     { upTo: 25000, unitAmountDecimal: "0.002" },
+ *     { upTo: "inf", flatAmountDecimal: "3000" }
+ *   ]
+ * });
  */
 export const Price = Resource(
   "stripe::Price",
@@ -370,6 +400,9 @@ export const Price = Resource(
           expand: ["tiers"],
         };
 
+        // Note: Stripe doesn't allow updating recurring fields (including meter) after price creation
+        // If meter needs to be changed, a new price must be created
+
         price = await stripe.prices.update(this.output.id, updateParams);
       } else {
         // Create new price
@@ -401,6 +434,21 @@ export const Price = Resource(
             usage_type: props.recurring.usageType,
             aggregate_usage: props.recurring.aggregateUsage,
           };
+
+          // Add meter to recurring if present (only for metered usage type)
+          if (props.meter) {
+            if (props.recurring.usageType !== "metered") {
+              throw new Error(
+                "Meter can only be set for prices with recurring.usageType = 'metered'",
+              );
+            }
+            // Extend the recurring params with meter
+            (
+              createParams.recurring as Stripe.PriceCreateParams.Recurring & {
+                meter: string;
+              }
+            ).meter = props.meter;
+          }
         }
 
         // Add tier configuration if present
@@ -424,6 +472,13 @@ export const Price = Resource(
             divide_by: props.transformQuantity.divideBy,
             round: props.transformQuantity.round,
           };
+        }
+
+        // Check if meter is set without recurring
+        if (props.meter && !props.recurring) {
+          throw new Error(
+            "Meter can only be set for prices with recurring.usageType = 'metered'",
+          );
         }
 
         if (props.lookupKey) {
@@ -452,7 +507,7 @@ export const Price = Resource(
               // Need to retrieve with expanded tiers
               price = await stripe.prices.retrieve(existingPrices.data[0].id, {
                 expand: ["tiers"],
-              } as any);
+              });
             }
           } else {
             price = await stripe.prices.create(createParams);
@@ -515,6 +570,11 @@ export const Price = Resource(
         tiers: tiers,
         tiersMode: price.tiers_mode ?? undefined,
         transformQuantity: transformQuantity,
+        meter:
+          (price.recurring &&
+            (price.recurring as Stripe.Price.Recurring & { meter?: string })
+              .meter) ||
+          undefined,
       });
     } catch (error) {
       logger.error("Error creating/updating price:", error);
